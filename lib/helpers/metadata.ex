@@ -1,10 +1,12 @@
 defmodule Burrito.Helpers.Metadata do
   require Logger
 
+  alias Burrito.Zig
+
   def run(self_path, args, release) do
     Logger.info("Generating wrapper metadata file...")
 
-    {zig_version_string, 0} = System.cmd("zig", ["version"], cd: self_path)
+    zig_version_string = Zig.version(self_path)
 
     metadata_map = %{
       app_name: Atom.to_string(release.name),

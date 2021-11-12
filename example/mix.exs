@@ -17,7 +17,7 @@ defmodule ExampleCliApp.MixProject do
     example_cli_app: [
       steps: [:assemble, &Burrito.wrap/1],
       burrito: [
-        targets: [:darwin, :win64, :linux, :linux_musl],
+        targets: [{:windows, :x86_64}],
         debug: Mix.env() != :prod,
         plugin: "./test_plugin/plugin.zig",
         no_clean: false,
