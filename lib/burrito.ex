@@ -4,6 +4,7 @@ defmodule Burrito do
   require Logger
 
   alias Burrito.BuildContext
+  alias Burrito.Util
 
   @spec wrap(Mix.Release.t()) :: Mix.Release.t()
   def wrap(%Mix.Release{} = release) do
@@ -43,7 +44,7 @@ defmodule Burrito do
       plugin: plugin,
     }
 
-    platform_os = elem(platform, 0)
+    target_os = elem(platform, 0)
 
     platform_module =
       case elem(platform, 0) do
@@ -56,13 +57,19 @@ defmodule Burrito do
     if platform_module do
       # Pre-checks
       Helpers.Precheck.run()
-
-      # Boot up finch
-      :telemetry_sup.start_link()
-      Finch.start_link(name: Req.Finch)
+      platform_module.init(build_context)
 
       # Maybe download replacement ERTS
-      platform_module.download_erts(build_context)
+      otp_version = Util.get_otp_verson()
+
+      if Util.get_current_os() != target_os do
+        Burrito.OTPFetcher.download_and_replace_erts_release(
+          build_context.release.erts_version,
+          otp_version,
+          build_context.work_directory,
+          build_context.target
+        )
+      end
 
       # Patch the ERTS statup scripts
       Helpers.PatchStartupScripts.run(build_context.self_path, build_context.work_directory, release.name)
@@ -74,7 +81,7 @@ defmodule Burrito do
       platform_module.compile_wrapper(build_context)
     else
       Logger.error(
-        "Could not find a platform module for #{platform_os}, please implement one using the `Burrito.Platform` behaviour!"
+        "Could not find a platform module for #{target_os}, please implement one using the `Burrito.Platform` behaviour!"
       )
     end
 

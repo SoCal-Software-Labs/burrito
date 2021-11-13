@@ -14,7 +14,7 @@ defmodule Burrito.Platform do
     "#{Atom.to_string(arch)}-#{Atom.to_string(os)}"
   end
 
-  @callback download_erts(Burrito.BuildContext.t()) :: Burrito.BuildContext.t()
+  @callback init(Burrito.BuildContext.t()) :: Burrito.BuildContext.t()
   @callback recompile_nifs(Burrito.BuildContext.t()) :: Burrito.BuildContext.t()
   @callback compile_wrapper(Burrito.BuildContext.t()) :: Burrito.BuildContext.t()
 end

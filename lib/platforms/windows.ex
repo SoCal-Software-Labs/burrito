@@ -3,30 +3,15 @@ defmodule Burrito.Platforms.Windows do
 
   alias Burrito.BuildContext
   alias Burrito.Helpers
-  alias Burrito.Util
 
   require Logger
 
-  @spec download_erts(BuildContext.t()) :: BuildContext.t()
-  def download_erts(%BuildContext{} = build_context) do
-    target_os = elem(build_context.target, 0)
-    target_arch = elem(build_context.target, 1)
-
+  @spec init(BuildContext.t()) :: BuildContext.t()
+  def init(%BuildContext{} = build_context) do
     # Currently we only support Windows 64-bit
     exit_if_wrong_arch(build_context)
 
-    otp_version = Util.get_otp_verson()
-
-    if Util.get_current_os() != target_os do
-      Burrito.OTPFetcher.download_and_replace_erts_release(
-        build_context.release.erts_version,
-        otp_version,
-        build_context.work_directory,
-        :win64
-      )
-    end
-
-    target_arch
+    build_context
   end
 
   @spec recompile_nifs(BuildContext.t()) :: BuildContext.t()

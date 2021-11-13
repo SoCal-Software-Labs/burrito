@@ -1,8 +1,10 @@
 defmodule Burrito.OTPFetcher do
   require Logger
 
-  @versions_url_darwin_linux "https://api.github.com/repos/burrito-elixir/erlang-builder/releases?per_page=100"
-  @versions_url_windows "https://api.github.com/repos/erlang/otp/releases?per_page=100"
+  alias Burrito.Platform
+
+  @erlang_builder_release_url "https://api.github.com/repos/burrito-elixir/erlang-builder/releases?per_page=100"
+  @erlang_release_url "https://api.github.com/repos/erlang/otp/releases?per_page=100"
 
   @erl_launch_script """
   #!/bin/sh
@@ -32,52 +34,75 @@ defmodule Burrito.OTPFetcher do
   $ROOTDIR/bin/run_erl -daemon /tmp/ $ROOTDIR/log "exec $ROOTDIR/bin/start_erl $ROOTDIR $RELDIR $START_ERL_DATA"
   """
 
+  @spec download_and_replace_erts_release(String.t(), String.t(), String.t(), Platform.build_tuple()) :: any()
   def download_and_replace_erts_release(erts_version, otp_version, release_path, platform) do
+    # Boot up finch
+    :telemetry_sup.start_link()
+    Finch.start_link(name: Req.Finch)
+
+    platform = case platform do
+      {_, _, _} -> platform
+      {os, arch} -> {os, arch, :none}
+    end
+
     versions = get_otp_versions(platform)
+    selected_version = Enum.find(versions, fn {v, download_url} -> v == otp_version && download_url != nil end)
 
-    selected_version =
-      Enum.find(versions, fn {v, download_url} -> v == otp_version && download_url != nil end)
-
-    # die if we cannot download that version
     if selected_version == nil do
-      Logger.error(
-        "Sorry! We cannot fetch the requested OTP version (OTP-#{otp_version}) for platform #{inspect(platform)} as it's not available in [burrito-elixir/erlang-builder] or [otp/releases]"
-      )
-
+      Logger.error("Sorry! We cannot fetch the requested OTP version (OTP-#{otp_version}) for platform #{inspect(platform)} as it's not available in [burrito-elixir/erlang-builder] or [otp/releases]")
       exit(1)
     end
 
     {_, download_url} = selected_version
-
     Logger.info("Downloading replacement ERTS: #{download_url}")
 
     data = Req.get!(download_url).body
     do_unpack(data, release_path, erts_version, platform)
   end
 
-  def get_otp_versions(platform) do
-    {res, platform_string} =
-      case platform do
-        :darwin -> {Req.get!(@versions_url_darwin_linux).body, "darwin"}
-        :linux -> {Req.get!(@versions_url_darwin_linux).body, "linux"}
-        :linux_musl -> {Req.get!(@versions_url_darwin_linux).body, "musl_libc"}
-        :win64 -> {Req.get!(@versions_url_windows).body, "win64"}
-        _ ->
-          Logger.error("#{inspect(platform)} is not a valid target platform! Burrito supports :darwin, :linux, and :win64")
-          exit(1)
-      end
+  @spec get_otp_versions(Platform.build_tuple()) :: list
+  def get_otp_versions({os, _, _} = platform) do
+    url = case os do
+      :windows -> @erlang_release_url
+      :linux -> @erlang_builder_release_url
+      :darwin -> @erlang_builder_release_url
+    end
 
-    Enum.map(res, fn release ->
+    response_json = Req.get!(url).body
+
+    find_list = get_find_list(platform)
+    Enum.map(response_json, fn release ->
       version = String.replace_leading(release["tag_name"], "OTP-", "")
       asset =
         release["assets"]
-        |> Enum.find(fn asset -> String.contains?(asset["name"], platform_string) end)
+        |> Enum.find(fn asset ->
+          asset_name = asset["name"]
+          String.contains?(asset_name, find_list)
+        end)
 
       {version, asset["browser_download_url"]}
     end)
   end
 
-  defp do_unpack(data, release_path, erts_version, :win64) do
+  # This function is a bit of a hack to get around the fact that
+  # OTP release exe and tarballs are not named consistently
+  # (Windows is really the big exception here)
+  defp get_find_list({:windows, _, _}) do
+    ["win64", ".exe"]
+  end
+
+
+  defp get_find_list({os, arch, libc}) do
+    libc = if libc == :musl do
+      "_musl_libc"
+    else
+      ""
+    end
+
+    ["#{Atom.to_string(os)}-#{Atom.to_string(arch)}#{libc}.tar.gz"]
+  end
+
+  defp do_unpack(data, release_path, erts_version, {:windows, _, _}) do
     dest_dir = System.tmp_dir!()
     dest_path = Path.join(dest_dir, "erlang.exe")
 
@@ -99,7 +124,7 @@ defmodule Burrito.OTPFetcher do
     File.rm_rf!(dst_bin_path)
     File.mkdir!(dst_bin_path)
 
-    Logger.info("Replacing ERTS bins with win64 ones...")
+    Logger.info("Replacing ERTS bins with Windows ones...")
 
     src_bin_path = Path.join(extraction_path, "erts-*/bin") |> Path.wildcard() |> List.first()
     File.cp_r!(src_bin_path, dst_bin_path)
@@ -137,7 +162,7 @@ defmodule Burrito.OTPFetcher do
     extraction_path
   end
 
-  defp do_unpack(data, release_path, erts_version, :darwin) do
+  defp do_unpack(data, release_path, erts_version, {:darwin, _, _}) do
     dest_dir = System.tmp_dir!()
     dest_path = Path.join(dest_dir, "erlang_macos.tgz")
 
@@ -197,7 +222,7 @@ defmodule Burrito.OTPFetcher do
     extraction_path
   end
 
-  defp do_unpack(data, release_path, erts_version, :linux) do
+  defp do_unpack(data, release_path, erts_version, {:linux, _, _}) do
     dest_dir = System.tmp_dir!()
     dest_path = Path.join(dest_dir, "erlang_linux.tgz")
 
@@ -254,6 +279,4 @@ defmodule Burrito.OTPFetcher do
 
     extraction_path
   end
-
-  defp do_unpack(data, release_path, erts_version, :linux_musl), do: do_unpack(data, release_path, erts_version, :linux)
 end
