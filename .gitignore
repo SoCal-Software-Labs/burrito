@@ -30,10 +30,10 @@ Temporary Items
 ### zig ###
 # Zig programming language
 
-zig-cache/
-zig-out/
-build-*/
-docgen_tmp/
+**/zig-cache
+**/zig-out
+**/build-*
+**/docgen_tmp/
 
 *.exe
 *.pdb
@@ -41,13 +41,14 @@ payload.foilz*
 _metadata.json
 
 ### Elixir ###
-/_build
-/cover
-/deps
-/doc
-/.fetch
+**/_build
+**/cover
+**/deps
+**/doc
+**/.fetch
 erl_crash.dump
 *.ez
 *.beam
-/config/*.secret.exs
+**/config/*.secret.exs
 .elixir_ls/
+**/burrito_out
