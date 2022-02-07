@@ -1,9 +1,9 @@
-defmodule ExampleCliApp.MixProject do
+defmodule OnlyOne.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :example_cli_app,
+      app: :only_one,
       releases: releases(),
       version: "0.1.0",
       elixir: "~> 1.12",
@@ -23,13 +23,8 @@ defmodule ExampleCliApp.MixProject do
             linux_musl: [os: :linux, cpu: :x86_64, libc: :musl],
             windows: [os: :windows, cpu: :x86_64]
           ],
-          extra_steps: [
-            fetch: [pre: [ExampleCliApp.CustomBuildStep]],
-            build: [post: [ExampleCliApp.CustomBuildStep]]
-          ],
           debug: Mix.env() != :prod,
-          plugin: "./test_plugin/plugin.zig",
-          no_clean: false
+          plugin: "./plugin/file_check.zig",
         ]
       ]
     ]
@@ -38,13 +33,14 @@ defmodule ExampleCliApp.MixProject do
   def application do
     [
       extra_applications: [:logger],
-      mod: {ExampleCliApp, []}
+      mod: {OnlyOne, []}
     ]
   end
 
   defp deps do
     [
-      {:burrito, path: "../../"}
+      {:burrito, path: "../../"},
+      {:evac, "~> 0.2.0"}
     ]
   end
 end
