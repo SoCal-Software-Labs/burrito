@@ -9,8 +9,7 @@ defmodule Burrito.Steps.Fetch.Init do
   @impl Step
   def execute(%Context{} = context) do
     random_id = :crypto.strong_rand_bytes(8) |> Base.encode16()
-    work_dir = Path.expand("~/burrito_build") |> Path.join(["burrito_build_#{random_id}"])
-    :ok = File.mkdir_p(work_dir)
+    work_dir = System.tmp_dir!() |> Path.join(["burrito_build_#{random_id}"])
     File.cp_r(context.mix_release.path, work_dir, fn _, _ -> true end)
 
     Log.info(:step, "Working directory: #{work_dir}")
