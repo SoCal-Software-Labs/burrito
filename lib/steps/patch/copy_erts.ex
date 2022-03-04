@@ -14,6 +14,9 @@ defmodule Burrito.Steps.Patch.CopyERTS do
       # nothing to do
       {:runtime, _} ->
         context
+        
+      {:precompiled, _} ->
+        context
 
       {:local_unpacked, [path: location]} ->
         # copy unpacked bins into release working directory
